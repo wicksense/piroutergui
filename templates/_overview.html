@@ -3,6 +3,7 @@
 <section class="toolbar">
   <button hx-get="/partials/overview" hx-target="#overview">Refresh</button>
   <button hx-post="/system/apply" hx-target="#overview">Apply Router Config</button>
+  <form action="/logout" method="post"><button type="submit">Logout</button></form>
   {% if message %}<span class="msg">{{ message }}</span>{% endif %}
 </section>
 

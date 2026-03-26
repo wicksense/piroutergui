@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import os
 import shutil
@@ -10,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -25,9 +27,27 @@ NFT_MANAGED_PATH = Path(os.getenv("PRG_NFT_MANAGED_PATH", "/etc/nftables.d/pirou
 DNSMASQ_RELOAD_CMD = os.getenv("PRG_DNSMASQ_RELOAD_CMD", "systemctl reload dnsmasq")
 NFT_APPLY_CMD = os.getenv("PRG_NFT_APPLY_CMD", f"nft -f {NFT_MANAGED_PATH}")
 
+AUTH_ENABLED = os.getenv("PRG_AUTH_ENABLED", "true").lower() == "true"
+AUTH_USERNAME = os.getenv("PRG_AUTH_USERNAME", "admin")
+AUTH_PASSWORD = os.getenv("PRG_AUTH_PASSWORD", "change-me")
+AUTH_SECRET = os.getenv("PRG_AUTH_SECRET", "piroutergui-secret")
+AUTH_COOKIE = "prg_auth"
+
 app = FastAPI(title="PiRouterGUI")
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+
+
+def auth_cookie_value() -> str:
+    payload = f"{AUTH_USERNAME}:{AUTH_PASSWORD}:{AUTH_SECRET}".encode()
+    return hashlib.sha256(payload).hexdigest()
+
+
+def is_authenticated(request: Request) -> bool:
+    if not AUTH_ENABLED:
+        return True
+    token = request.cookies.get(AUTH_COOKIE, "")
+    return hmac.compare_digest(token, auth_cookie_value())
 
 
 def exec_text(command: str) -> str:
@@ -367,6 +387,49 @@ def render_overview(request: Request, message: str = "") -> HTMLResponse:
         "_overview.html",
         {"overview": get_overview(), "message": message},
     )
+
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    if not AUTH_ENABLED:
+        return await call_next(request)
+
+    path = request.url.path
+    public_paths = {"/login"}
+    if path.startswith("/static") or path in public_paths:
+        return await call_next(request)
+
+    if is_authenticated(request):
+        return await call_next(request)
+
+    return RedirectResponse(url="/login", status_code=302)
+
+
+@app.get("/login", response_class=HTMLResponse)
+def login_page(request: Request):
+    if is_authenticated(request):
+        return RedirectResponse(url="/", status_code=302)
+    return templates.TemplateResponse(request, "login.html", {"error": ""})
+
+
+@app.post("/login", response_class=HTMLResponse)
+def login_submit(request: Request, username: str = Form(...), password: str = Form(...)):
+    if not AUTH_ENABLED:
+        return RedirectResponse(url="/", status_code=302)
+
+    if hmac.compare_digest(username, AUTH_USERNAME) and hmac.compare_digest(password, AUTH_PASSWORD):
+        resp = RedirectResponse(url="/", status_code=302)
+        resp.set_cookie(AUTH_COOKIE, auth_cookie_value(), httponly=True, samesite="lax")
+        return resp
+
+    return templates.TemplateResponse(request, "login.html", {"error": "Invalid username or password"})
+
+
+@app.post("/logout")
+def logout():
+    resp = RedirectResponse(url="/login", status_code=302)
+    resp.delete_cookie(AUTH_COOKIE)
+    return resp
 
 
 @app.get("/", response_class=HTMLResponse)

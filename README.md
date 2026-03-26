@@ -118,6 +118,20 @@ sudo docker compose -f docker-compose.full.yml logs -f
 
 ---
 
+## Authentication
+
+Authentication is enabled by default.
+
+Default login:
+- Username: `admin`
+- Password: `change-me`
+
+Set secure credentials via service environment:
+- `PRG_AUTH_ENABLED=true|false`
+- `PRG_AUTH_USERNAME=...`
+- `PRG_AUTH_PASSWORD=...`
+- `PRG_AUTH_SECRET=...`
+
 ## Safety model
 
 - Runtime state file:

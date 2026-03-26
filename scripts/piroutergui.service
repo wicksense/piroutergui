@@ -17,6 +17,10 @@ Environment=PRG_DNSMASQ_MANAGED_PATH=/etc/dnsmasq.d/piroutergui-static.conf
 Environment=PRG_NFT_MANAGED_PATH=/etc/nftables.d/piroutergui-blocklist.nft
 Environment="PRG_DNSMASQ_RELOAD_CMD=systemctl reload dnsmasq"
 Environment="PRG_NFT_APPLY_CMD=nft -f /etc/nftables.d/piroutergui-blocklist.nft"
+Environment="PRG_AUTH_ENABLED=true"
+Environment="PRG_AUTH_USERNAME=admin"
+Environment="PRG_AUTH_PASSWORD=change-me"
+Environment="PRG_AUTH_SECRET=change-this-secret"
 
 [Install]
 WantedBy=multi-user.target
