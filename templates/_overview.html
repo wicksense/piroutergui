@@ -33,10 +33,10 @@
   </div>
   <form class="add-device" hx-post="/network/apply" hx-target="#overview">
     <input name="wlan_iface" value="{{ o.network.wlanIface }}" placeholder="wlan0" required />
-    <input name="uplink_iface" value="{{ o.network.uplinkIface }}" placeholder="eth0" required />
     <input name="wlan_cidr" value="{{ o.network.wlanCidr }}" placeholder="192.168.50.1/24" required />
     <button type="submit">Apply Network</button>
   </form>
+  <p class="networks">Uplink interface is configured in the Firewall section (currently: {{ o.firewall.uplinkIface }}).</p>
 </section>
 
 <section class="panel">

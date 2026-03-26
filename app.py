@@ -777,10 +777,11 @@ def overview_partial(request: Request):
 
 
 @app.post("/network/apply", response_class=HTMLResponse)
-def update_network(request: Request, wlan_iface: str = Form(...), uplink_iface: str = Form(...), wlan_cidr: str = Form(...)):
+def update_network(request: Request, wlan_iface: str = Form(...), wlan_cidr: str = Form(...)):
     state = load_state()
-    state["network"].update({"wlanIface": wlan_iface.strip(), "uplinkIface": uplink_iface.strip(), "wlanCidr": wlan_cidr.strip()})
-    state["firewall"].update({"wifiIface": wlan_iface.strip(), "uplinkIface": uplink_iface.strip()})
+    state["network"].update({"wlanIface": wlan_iface.strip(), "wlanCidr": wlan_cidr.strip()})
+    # Keep firewall Wi-Fi iface aligned, but uplink is managed only from Firewall panel.
+    state["firewall"].update({"wifiIface": wlan_iface.strip()})
     save_state(state)
     res = apply_network_settings(state)
     return render_overview(request, apply_message("Network settings applied.", res))
