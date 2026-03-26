@@ -18,7 +18,32 @@ Pi-first router admin UI using **Python + FastAPI + HTMX**.
 
 ![PiRouterGUI HTMX mobile dashboard](docs/assets/htmx-dashboard-mobile.png)
 
-## Run locally (Python)
+## Easiest Pi install (recommended)
+
+One command:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/wicksense/piroutergui/main/scripts/install-pi.sh | bash
+```
+
+This will:
+- install Python/git dependencies
+- clone or update the repo in `~/piroutergui`
+- create `.venv` + install requirements
+- install and start `piroutergui.service`
+- enable auto-start on boot
+
+Then open: `http://<pi-ip>:8080`
+
+### Service management
+
+```bash
+sudo systemctl status piroutergui
+sudo systemctl restart piroutergui
+sudo journalctl -u piroutergui -f
+```
+
+## Manual run (Python)
 
 ```bash
 python3 -m venv .venv
