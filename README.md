@@ -4,11 +4,24 @@ A modern web interface for managing a Raspberry Pi based router.
 
 ## Current status
 
-Initial UI scaffold is complete:
+Implemented:
 - Responsive dashboard shell
 - Sidebar navigation
 - System status cards
-- Connected clients table
+- Connected clients discovery (`ip neigh` + `dnsmasq.leases` enrichment)
+- Client actions: block/unblock + static lease set/clear
+- Managed config apply for dnsmasq + nftables
+- Backup-first writes for state and managed config files
+
+## Screenshots
+
+### Desktop dashboard
+
+![PiRouterGUI desktop dashboard](docs/assets/dashboard-desktop.png)
+
+### Mobile layout
+
+![PiRouterGUI mobile dashboard](docs/assets/dashboard-mobile.png)
 
 ## Getting started
 
@@ -35,8 +48,7 @@ Then open http://localhost:5173
 
 ## Next steps
 
-- Convert block/unblock to real firewall enforcement (nftables rules)
-- Convert static lease action to dnsmasq hostfile writes + service reload
-- Build auth/session handling
-- Add forms for WAN/LAN, DHCP, Wi-Fi, firewall, and QoS settings
-- Add live logs + service health panels
+- Add authentication/session controls
+- Add stronger input validation + conflict checks for static IP assignment
+- Add router logs view + service restart controls
+- Add WAN/LAN/DHCP/Wi-Fi full config forms
