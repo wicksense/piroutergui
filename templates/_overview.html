@@ -23,6 +23,16 @@
 </section>
 
 <section class="panel">
+  <h3>Add New Device</h3>
+  <form class="add-device" hx-post="/clients/add" hx-target="#overview">
+    <input name="mac" placeholder="88:a2:9e:aa:bb:cc" required />
+    <input name="ip" placeholder="192.168.50.20" required />
+    <input name="hostname" placeholder="pi-zero-new (optional)" />
+    <button type="submit">Add Device</button>
+  </form>
+</section>
+
+<section class="panel">
   <h3>Connected Clients</h3>
   {% if o.networks %}
     <p class="networks">Detected networks: {{ o.networks | join(', ') }}</p>

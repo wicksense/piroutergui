@@ -60,9 +60,16 @@ def backup_if_exists(path: Path, prefix: str) -> str | None:
 
 def load_state() -> dict[str, Any]:
     try:
-        return json.loads(STATE_PATH.read_text())
+        state = json.loads(STATE_PATH.read_text())
     except Exception:
-        return {"blockedMacs": [], "staticLeases": {}}
+        state = {}
+
+    if not isinstance(state, dict):
+        state = {}
+    state.setdefault("blockedMacs", [])
+    state.setdefault("staticLeases", {})
+    state.setdefault("deviceNames", {})
+    return state
 
 
 def save_state(state: dict[str, Any]) -> str | None:
@@ -179,6 +186,24 @@ def read_dhcp_host_config() -> list[dict[str, str]]:
     return hosts
 
 
+def is_valid_mac(mac: str) -> bool:
+    parts = mac.split(":")
+    if len(parts) != 6:
+        return False
+    try:
+        return all(len(p) == 2 and 0 <= int(p, 16) <= 255 for p in parts)
+    except Exception:
+        return False
+
+
+def is_valid_ipv4(ip: str) -> bool:
+    try:
+        ip_network(f"{ip}/32", strict=False)
+        return ip.count(".") == 3
+    except Exception:
+        return False
+
+
 def subnet_from_ip(ip: str) -> str:
     parts = ip.split(".")
     if len(parts) == 4:
@@ -286,6 +311,26 @@ def discover_clients() -> list[dict[str, Any]]:
             "staticLeaseIp": state.get("staticLeases", {}).get(mac),
         }
 
+    # Fourth pass: PiRouterGUI-managed static leases (new devices added from UI)
+    device_names = state.get("deviceNames", {})
+    for mac, ip in state.get("staticLeases", {}).items():
+        mac_l = str(mac).lower()
+        ip_s = str(ip)
+        if not ip_s or ip_s in rows:
+            continue
+        hostname = str(device_names.get(mac_l, "")).strip()
+        rows[ip_s] = {
+            "name": hostname or f"client-{ip_s.split('.')[-1]}",
+            "ip": ip_s,
+            "subnet": subnet_from_ip(ip_s),
+            "mac": mac_l,
+            "iface": "piroutergui",
+            "type": infer_device_type(hostname),
+            "status": "Configured",
+            "blocked": mac_l in blocked,
+            "staticLeaseIp": ip_s,
+        }
+
     return sorted(rows.values(), key=lambda x: [int(p) for p in x["ip"].split(".")])
 
 
@@ -332,6 +377,28 @@ def home(request: Request):
 @app.get("/partials/overview", response_class=HTMLResponse)
 def overview_partial(request: Request):
     return render_overview(request)
+
+
+@app.post("/clients/add", response_class=HTMLResponse)
+def add_client(request: Request, mac: str = Form(...), ip: str = Form(...), hostname: str = Form("")):
+    mac = mac.strip().lower()
+    ip = ip.strip()
+    hostname = hostname.strip()
+
+    if not is_valid_mac(mac):
+        return render_overview(request, "Add device failed: invalid MAC format.")
+    if not is_valid_ipv4(ip):
+        return render_overview(request, "Add device failed: invalid IPv4 address.")
+
+    state = load_state()
+    state.setdefault("staticLeases", {})[mac] = ip
+    if hostname:
+        state.setdefault("deviceNames", {})[mac] = hostname
+    save_state(state)
+    apply = write_managed_files(state)
+    errs = [x.get("error") for x in [apply.get("dnsmasq", {}), apply.get("nftables", {})] if x.get("error")]
+    msg = "Device added." if not errs else f"Device added with warnings: {' | '.join(errs)}"
+    return render_overview(request, msg)
 
 
 @app.post("/clients/{mac}/block", response_class=HTMLResponse)
