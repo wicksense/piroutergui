@@ -4,6 +4,7 @@
   <button hx-get="/partials/overview" hx-target="#overview">Refresh</button>
   <button hx-post="/system/apply" hx-target="#overview">Apply All</button>
   <form action="/logout" method="post"><button type="submit">Logout</button></form>
+  <span class="hint">Apply All runs Network + Wi‑Fi + DHCP + Firewall in one shot.</span>
   {% if message %}<span class="msg">{{ message }}</span>{% endif %}
 </section>
 
@@ -16,6 +17,7 @@
 
 <section class="panel">
   <h3>Services</h3>
+  <p class="hint">Read-only status for core services. This section does not write config.</p>
   <ul class="svc">
     {% for name, status in o.services.items() %}
       <li><span>{{ name }}</span><b class="{{ 'ok' if status == 'active' else 'bad' }}">{{ status }}</b></li>
@@ -25,6 +27,7 @@
 
 <section class="panel">
   <h3>Interfaces & Networks</h3>
+  <p class="hint">Sets Wi‑Fi interface IP/CIDR. Writes managed block in <code>/etc/rc.local</code> and applies <code>ip addr replace</code> live.</p>
   {% if o.networks %}<p class="networks">Detected routes: {{ o.networks | join(', ') }}</p>{% endif %}
   <div class="iface-grid">
     {% for i in o.interfaces %}
@@ -41,6 +44,7 @@
 
 <section class="panel">
   <h3>Wi-Fi AP (hostapd)</h3>
+  <p class="hint">Updates AP settings. Writes <code>/etc/hostapd/hostapd.conf</code> + <code>/etc/default/hostapd</code>, validates, then restarts hostapd.</p>
   <form class="add-device" hx-post="/wifi/apply" hx-target="#overview">
     <input name="interface" value="{{ o.wifi.interface }}" placeholder="wlan0" required />
     <input name="ssid" value="{{ o.wifi.ssid }}" placeholder="SSID" required />
@@ -53,6 +57,7 @@
 
 <section class="panel">
   <h3>DHCP (dnsmasq)</h3>
+  <p class="hint">Sets DHCP interface/range and static hosts. Writes PiRouterGUI managed block in <code>/etc/dnsmasq.conf</code>, validates and reloads dnsmasq.</p>
   <form class="add-device" hx-post="/dhcp/apply" hx-target="#overview">
     <input name="interface" value="{{ o.dhcp.interface }}" placeholder="wlan0" required />
     <input name="range_start" value="{{ o.dhcp.rangeStart }}" placeholder="192.168.50.10" required />
@@ -65,6 +70,7 @@
 
 <section class="panel">
   <h3>Firewall Isolation</h3>
+  <p class="hint">Adds/removes two FORWARD drop rules between Wi‑Fi and uplink. Persists rules to <code>/etc/iptables/rules.v4</code>. Does not change DHCP.</p>
   <p class="networks">Wi‑Fi side: <strong>{{ o.firewall.wifiIface }}</strong> (from Network panel)</p>
   <form class="add-device" hx-post="/firewall/apply" hx-target="#overview">
     <input name="uplink_iface" value="{{ o.firewall.uplinkIface }}" placeholder="eth0" required />
@@ -75,6 +81,7 @@
 
 <section class="panel">
   <h3>Add New Device</h3>
+  <p class="hint">Creates a static lease entry (MAC → IP) and optional hostname in managed DHCP config.</p>
   <form class="add-device" hx-post="/clients/add" hx-target="#overview">
     <input name="mac" placeholder="88:a2:9e:aa:bb:cc" required />
     <input name="ip" placeholder="192.168.50.20" required />
@@ -85,6 +92,7 @@
 
 <section class="panel">
   <h3>Clients</h3>
+  <p class="hint">Block/Unblock updates nftables blocklist. Set Lease/Clear updates DHCP static leases for that device.</p>
   <table>
     <thead>
       <tr><th>Device</th><th>IP</th><th>Subnet</th><th>MAC</th><th>Status</th><th>Actions</th></tr>
@@ -118,6 +126,7 @@
 
 <section class="panel">
   <h3>Monitoring</h3>
+  <p class="hint">Read-only diagnostics pulled from host commands (hostapd_cli, leases, ip neigh, ip addr, routes).</p>
   <details>
     <summary>hostapd stations</summary>
     <pre>{{ o.monitor.hostapdStations }}</pre>

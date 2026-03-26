@@ -3,6 +3,8 @@ body{font-family:Inter,system-ui,sans-serif;background:#0b1220;color:#dce6ff;mar
 h1{margin:0}.subtitle{color:#99abd8;margin:6px 0 14px}
 .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0 14px}
 .msg{color:#b9ccff;font-size:.9rem}
+.hint{color:#8fa5d9;font-size:.84rem;line-height:1.35}
+code{background:#0b1429;border:1px solid #273d6b;border-radius:6px;padding:1px 5px;font-size:.82rem;color:#c8d7ff}
 button{background:#21386c;color:#fff;border:1px solid #3d5fa8;border-radius:8px;padding:7px 10px;cursor:pointer}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
 .cards article,.panel{background:#101a32;border:1px solid #24355f;border-radius:10px;padding:12px;margin-top:10px}
