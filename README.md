@@ -29,7 +29,8 @@ curl -fsSL https://raw.githubusercontent.com/wicksense/piroutergui/main/scripts/
 This will:
 - install Python/git dependencies
 - clone or update the repo in `~/piroutergui`
-- create `.venv` + install requirements
+- create `.venv` only if missing
+- install Python deps only when `requirements.txt` changes
 - install and start `piroutergui.service`
 - enable auto-start on boot
 

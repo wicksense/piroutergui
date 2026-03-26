@@ -6,3 +6,4 @@ dist
 server/state/
 state/
 .venv/
+.install-state/
