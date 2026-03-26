@@ -614,10 +614,7 @@ def apply_firewall_settings(state: dict[str, Any]) -> dict[str, Any]:
 
     backup = backup_if_exists(IPTABLES_RULES_PATH, "iptables-rules")
 
-    policy = run_cmd(f"iptables -P FORWARD {'DROP' if enabled else 'ACCEPT'}")
-    if not policy["ok"]:
-        return {"ok": False, "backupPath": backup, "error": policy.get("error", "failed to set FORWARD policy")}
-
+    # Only manage pair-wise isolation rules for wifi <-> uplink. Do not change global FORWARD policy.
     e1 = _ensure_forward_rule(wifi_iface, uplink_iface, enabled)
     e2 = _ensure_forward_rule(uplink_iface, wifi_iface, enabled)
     if e1 or e2:
@@ -632,7 +629,9 @@ def apply_firewall_settings(state: dict[str, Any]) -> dict[str, Any]:
 
 def read_firewall_state(defaults: dict[str, Any]) -> dict[str, Any]:
     out = exec_text("iptables -S FORWARD")
-    enabled = "-j DROP" in out and (f"-i {defaults['wifiIface']} -o {defaults['uplinkIface']} -j DROP" in out)
+    rule_a = f"-A FORWARD -i {defaults['wifiIface']} -o {defaults['uplinkIface']} -j DROP"
+    rule_b = f"-A FORWARD -i {defaults['uplinkIface']} -o {defaults['wifiIface']} -j DROP"
+    enabled = rule_a in out and rule_b in out
     data = dict(defaults)
     data["enabled"] = enabled
     return data
@@ -836,8 +835,9 @@ def update_dhcp(
 
 
 @app.post("/firewall/apply", response_class=HTMLResponse)
-def update_firewall(request: Request, wifi_iface: str = Form(...), uplink_iface: str = Form(...), enabled: str | None = Form(None)):
+def update_firewall(request: Request, uplink_iface: str = Form(...), enabled: str | None = Form(None)):
     state = load_state()
+    wifi_iface = state.get("network", {}).get("wlanIface", state.get("firewall", {}).get("wifiIface", "wlan0"))
     state["firewall"].update(
         {
             "wifiIface": wifi_iface.strip(),
@@ -845,6 +845,7 @@ def update_firewall(request: Request, wifi_iface: str = Form(...), uplink_iface:
             "enabled": enabled == "on",
         }
     )
+    state["network"]["uplinkIface"] = uplink_iface.strip()
     save_state(state)
     res = apply_firewall_settings(state)
     return render_overview(request, apply_message("Firewall isolation settings applied.", res))

@@ -65,10 +65,10 @@
 
 <section class="panel">
   <h3>Firewall Isolation</h3>
+  <p class="networks">Wi‑Fi side: <strong>{{ o.firewall.wifiIface }}</strong> (from Network panel)</p>
   <form class="add-device" hx-post="/firewall/apply" hx-target="#overview">
-    <input name="wifi_iface" value="{{ o.firewall.wifiIface }}" placeholder="wlan0" required />
     <input name="uplink_iface" value="{{ o.firewall.uplinkIface }}" placeholder="eth0" required />
-    <label class="check"><input type="checkbox" name="enabled" {% if o.firewall.enabled %}checked{% endif %}/> Isolate WLAN/LAN</label>
+    <label class="check"><input type="checkbox" name="enabled" {% if o.firewall.enabled %}checked{% endif %}/> Enable isolation (block {{ o.firewall.wifiIface }} ↔ uplink)</label>
     <button type="submit">Apply Firewall</button>
   </form>
 </section>

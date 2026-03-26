@@ -9,7 +9,7 @@ Pi-first router admin UI using **Python + FastAPI + HTMX**.
 - **Network config** (`wlan` interface + CIDR)
 - **Wi-Fi AP config** (SSID, passphrase, channel, hw mode) → writes hostapd config
 - **DHCP config** (interface, range, lease duration, static leases) → writes dnsmasq managed block
-- **Firewall isolation** toggle (`wlan <-> uplink` block rules) + persist with `iptables-save`
+- **Firewall isolation** toggle (`wlan <-> uplink` drop rules only, no global FORWARD policy flip) + persist with `iptables-save`
 - Client inventory from neighbors + leases + dnsmasq static host config + UI-added devices
 - Add/edit/remove static leases from UI
 - Monitoring panels (`hostapd_cli`, leases, neighbors, interfaces, routes)
