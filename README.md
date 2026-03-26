@@ -20,6 +20,12 @@ npm run dev       # terminal 2 (UI on :5173)
 
 Then open http://localhost:5173
 
+## Safety behavior
+
+- Every client action change auto-backs up previous state file to:
+  - `server/state/backups/client-actions-YYYYMMDD-HHMMSS.bak`
+- Runtime state and backups are ignored by git.
+
 ## Next steps
 
 - Convert block/unblock to real firewall enforcement (nftables rules)

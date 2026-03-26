@@ -9,6 +9,7 @@ import { execSync } from 'node:child_process';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const stateDir = path.join(__dirname, 'state');
+const backupDir = path.join(stateDir, 'backups');
 const statePath = path.join(stateDir, 'client-actions.json');
 
 const app = express();
@@ -46,9 +47,26 @@ function loadState() {
   }
 }
 
+function makeTimestamp() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+}
+
+function backupFileIfExists(filePath, prefix) {
+  if (!fs.existsSync(filePath)) return null;
+
+  fs.mkdirSync(backupDir, { recursive: true });
+  const backupPath = path.join(backupDir, `${prefix}-${makeTimestamp()}.bak`);
+  fs.copyFileSync(filePath, backupPath);
+  return backupPath;
+}
+
 function saveState(state) {
   fs.mkdirSync(stateDir, { recursive: true });
+  const backupPath = backupFileIfExists(statePath, 'client-actions');
   fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
+  return backupPath;
 }
 
 function readDhcpLeases() {
@@ -167,8 +185,8 @@ app.post('/api/clients/:mac/block', (req, res) => {
 
   const state = loadState();
   if (!state.blockedMacs.includes(mac)) state.blockedMacs.push(mac);
-  saveState(state);
-  return res.json({ ok: true, mac, blocked: true });
+  const backupPath = saveState(state);
+  return res.json({ ok: true, mac, blocked: true, backupPath });
 });
 
 app.post('/api/clients/:mac/unblock', (req, res) => {
@@ -177,8 +195,8 @@ app.post('/api/clients/:mac/unblock', (req, res) => {
 
   const state = loadState();
   state.blockedMacs = state.blockedMacs.filter((m) => m !== mac);
-  saveState(state);
-  return res.json({ ok: true, mac, blocked: false });
+  const backupPath = saveState(state);
+  return res.json({ ok: true, mac, blocked: false, backupPath });
 });
 
 app.post('/api/clients/:mac/static-lease', (req, res) => {
@@ -188,8 +206,8 @@ app.post('/api/clients/:mac/static-lease', (req, res) => {
 
   const state = loadState();
   state.staticLeases[mac] = ip;
-  saveState(state);
-  return res.json({ ok: true, mac, ip });
+  const backupPath = saveState(state);
+  return res.json({ ok: true, mac, ip, backupPath });
 });
 
 app.delete('/api/clients/:mac/static-lease', (req, res) => {
@@ -198,8 +216,8 @@ app.delete('/api/clients/:mac/static-lease', (req, res) => {
 
   const state = loadState();
   delete state.staticLeases[mac];
-  saveState(state);
-  return res.json({ ok: true, mac });
+  const backupPath = saveState(state);
+  return res.json({ ok: true, mac, backupPath });
 });
 
 app.listen(port, () => {
