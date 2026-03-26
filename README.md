@@ -6,7 +6,7 @@ Pi-first router admin UI using **Python + FastAPI + HTMX**.
 
 - Live overview (CPU, memory, uptime, WAN IP)
 - Core service status (`hostapd`, `dnsmasq`, `nftables`)
-- Client discovery (`ip neigh` + `dnsmasq.leases`)
+- Client discovery (`ip neigh` + `dnsmasq.leases` + static `dhcp-host` entries from dnsmasq config)
 - Client actions:
   - Block / Unblock (managed nftables file)
   - Set / Clear static lease (managed dnsmasq include)

@@ -20,6 +20,7 @@ BACKUP_DIR = STATE_DIR / "backups"
 STATE_PATH = STATE_DIR / "client-actions.json"
 
 DNSMASQ_MANAGED_PATH = Path(os.getenv("PRG_DNSMASQ_MANAGED_PATH", "/etc/dnsmasq.d/piroutergui-static.conf"))
+DNSMASQ_CONFIG_PATH = Path(os.getenv("PRG_DNSMASQ_CONFIG_PATH", "/etc/dnsmasq.conf"))
 NFT_MANAGED_PATH = Path(os.getenv("PRG_NFT_MANAGED_PATH", "/etc/nftables.d/piroutergui-blocklist.nft"))
 DNSMASQ_RELOAD_CMD = os.getenv("PRG_DNSMASQ_RELOAD_CMD", "systemctl reload dnsmasq")
 NFT_APPLY_CMD = os.getenv("PRG_NFT_APPLY_CMD", f"nft -f {NFT_MANAGED_PATH}")
@@ -148,6 +149,36 @@ def infer_device_type(name: str) -> str:
     return "Device"
 
 
+def read_dhcp_host_config() -> list[dict[str, str]]:
+    """Parse static dhcp-host entries from dnsmasq config.
+
+    Supports lines like:
+      dhcp-host=88:a2:9e:7e:dd:55,192.168.50.11,pi-zero-1
+    """
+    try:
+        lines = DNSMASQ_CONFIG_PATH.read_text().splitlines()
+    except Exception:
+        return []
+
+    hosts: list[dict[str, str]] = []
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#") or not line.startswith("dhcp-host="):
+            continue
+
+        payload = line.split("=", 1)[1].strip()
+        parts = [p.strip() for p in payload.split(",") if p.strip()]
+        if len(parts) < 2:
+            continue
+
+        mac = parts[0].lower()
+        ip = parts[1]
+        name = parts[2] if len(parts) >= 3 else ""
+        hosts.append({"mac": mac, "ip": ip, "hostname": name})
+
+    return hosts
+
+
 def subnet_from_ip(ip: str) -> str:
     parts = ip.split(".")
     if len(parts) == 4:
@@ -233,6 +264,26 @@ def discover_clients() -> list[dict[str, Any]]:
             "status": "Lease",
             "blocked": resolved_mac != "N/A" and resolved_mac.lower() in blocked,
             "staticLeaseIp": state.get("staticLeases", {}).get(resolved_mac.lower()),
+        }
+
+    # Third pass: static dhcp-host config entries even if device is currently offline
+    for host in read_dhcp_host_config():
+        ip = host.get("ip", "")
+        mac = host.get("mac", "N/A").lower()
+        if not ip or ip in rows:
+            continue
+
+        hostname = host.get("hostname") or ""
+        rows[ip] = {
+            "name": hostname or f"client-{ip.split('.')[-1]}",
+            "ip": ip,
+            "subnet": subnet_from_ip(ip),
+            "mac": mac,
+            "iface": "dhcp-config",
+            "type": infer_device_type(hostname),
+            "status": "Configured",
+            "blocked": mac != "N/A" and mac in blocked,
+            "staticLeaseIp": state.get("staticLeases", {}).get(mac),
         }
 
     return sorted(rows.values(), key=lambda x: [int(p) for p in x["ip"].split(".")])
