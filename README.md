@@ -23,7 +23,7 @@ Pi-first router admin UI built with **Python + FastAPI + HTMX**.
 
 ## Screenshot
 
-![PiRouterGUI dashboard](docs/assets/htmx-dashboard-desktop.png)
+![PiRouterGUI dashboard](docs/assets/dashboard-latest-desktop.png)
 
 ## One-command Pi install (recommended)
 
