@@ -36,9 +36,18 @@ Open: `http://<pi-ip>:8080`
 ⚠️ Full mode grants container host-level networking control.
 Use only on a trusted Pi you control.
 
-### 1) Start
+### 1) First-time setup (clone)
 
 ```bash
+git clone https://github.com/wicksense/piroutergui.git
+cd piroutergui
+sudo docker compose -f docker-compose.full.yml up -d --build
+```
+
+### 2) Updates later
+
+```bash
+cd piroutergui
 git pull
 sudo docker compose -f docker-compose.full.yml up -d --build
 ```
