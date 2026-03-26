@@ -80,6 +80,3 @@ sudo docker compose -f docker-compose.full.yml logs -f
   - `dnsmasq --test`
   - `nft -c -f <managed file>`
 
-## Legacy prototype note
-
-The previous React/Node prototype still exists in the repo for reference (`src/`, `server/`, Vite files), but the recommended deployment path is this Python/HTMX stack.
