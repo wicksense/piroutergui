@@ -1,6 +1,25 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type NavKey = 'overview' | 'network' | 'wifi' | 'security' | 'system';
+
+type Client = { name: string; ip: string; type: string; status: string };
+
+type OverviewData = {
+  node: string;
+  uptimeSec: number;
+  stats: {
+    cpuLoadPct: number;
+    memUsedGb: number;
+    memTotalGb: number;
+    wanIp: string;
+  };
+  services: {
+    hostapd: string;
+    dnsmasq: string;
+    nftables: string;
+  };
+  clients: Client[];
+};
 
 const navItems: { key: NavKey; label: string }[] = [
   { key: 'overview', label: 'Overview' },
@@ -10,21 +29,52 @@ const navItems: { key: NavKey; label: string }[] = [
   { key: 'system', label: 'System' },
 ];
 
-const systemStats = [
-  { label: 'CPU Load', value: '18%' },
-  { label: 'Memory', value: '612 MB / 2 GB' },
-  { label: 'Uptime', value: '2d 04h 17m' },
-  { label: 'WAN IP', value: '100.85.42.12' },
-];
-
-const clients = [
-  { name: 'Raveen-MBP', ip: '192.168.8.21', type: 'Laptop', status: 'Online' },
-  { name: 'Pixel 9', ip: '192.168.8.33', type: 'Phone', status: 'Online' },
-  { name: 'Bedroom TV', ip: '192.168.8.70', type: 'TV', status: 'Idle' },
-];
+function formatUptime(seconds: number): string {
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  return `${days}d ${hours}h ${minutes}m`;
+}
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<NavKey>('overview');
+  const [data, setData] = useState<OverviewData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchOverview = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:8080/api/overview');
+      const json = (await response.json()) as OverviewData;
+      setData(json);
+    } catch {
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void fetchOverview();
+  }, []);
+
+  const statCards = useMemo(() => {
+    if (!data) {
+      return [
+        { label: 'CPU Load', value: '--' },
+        { label: 'Memory', value: '--' },
+        { label: 'Uptime', value: '--' },
+        { label: 'WAN IP', value: '--' },
+      ];
+    }
+
+    return [
+      { label: 'CPU Load', value: `${data.stats.cpuLoadPct}%` },
+      { label: 'Memory', value: `${data.stats.memUsedGb} GB / ${data.stats.memTotalGb} GB` },
+      { label: 'Uptime', value: formatUptime(data.uptimeSec) },
+      { label: 'WAN IP', value: data.stats.wanIp },
+    ];
+  }, [data]);
 
   return (
     <div className="app-shell">
@@ -50,13 +100,15 @@ export default function App() {
         <header className="header">
           <div>
             <h2>{navItems.find((item) => item.key === activeTab)?.label}</h2>
-            <span>Node: pi-router.local</span>
+            <span>Node: {data?.node ?? 'pi-router.local'}</span>
           </div>
-          <button className="primary">Apply Changes</button>
+          <button className="primary" onClick={() => void fetchOverview()}>
+            {loading ? 'Refreshing...' : 'Refresh Data'}
+          </button>
         </header>
 
         <section className="cards">
-          {systemStats.map((stat) => (
+          {statCards.map((stat) => (
             <article className="card" key={stat.label}>
               <small>{stat.label}</small>
               <strong>{stat.value}</strong>
@@ -67,7 +119,9 @@ export default function App() {
         <section className="panel">
           <div className="panel-title-row">
             <h3>Connected Clients</h3>
-            <button className="ghost">Refresh</button>
+            <button className="ghost" onClick={() => void fetchOverview()}>
+              Refresh
+            </button>
           </div>
           <table>
             <thead>
@@ -79,7 +133,7 @@ export default function App() {
               </tr>
             </thead>
             <tbody>
-              {clients.map((client) => (
+              {(data?.clients ?? []).map((client) => (
                 <tr key={client.ip}>
                   <td>{client.name}</td>
                   <td>{client.ip}</td>
@@ -93,6 +147,18 @@ export default function App() {
               ))}
             </tbody>
           </table>
+        </section>
+
+        <section className="panel">
+          <h3>Core Services</h3>
+          <div className="service-grid">
+            {Object.entries(data?.services ?? {}).map(([name, status]) => (
+              <div className="service-item" key={name}>
+                <span>{name}</span>
+                <span className={status === 'active' ? 'status online' : 'status'}>{status}</span>
+              </div>
+            ))}
+          </div>
         </section>
       </main>
     </div>

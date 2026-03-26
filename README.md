@@ -14,7 +14,8 @@ Initial UI scaffold is complete:
 
 ```bash
 npm install
-npm run dev
+npm run dev:api   # terminal 1 (API on :8080)
+npm run dev       # terminal 2 (UI on :5173)
 ```
 
 Then open http://localhost:5173
