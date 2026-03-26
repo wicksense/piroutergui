@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PiRouterGUI</title>
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <h1>PiRouterGUI</h1>
+      <p class="subtitle">Raspberry Pi Router Control Panel</p>
+      <div id="overview" hx-get="/partials/overview" hx-trigger="every 10s" hx-swap="innerHTML">
+        {% include '_overview.html' %}
+      </div>
+    </main>
+  </body>
+</html>

@@ -1,54 +1,47 @@
 # PiRouterGUI
 
-A modern web interface for managing a Raspberry Pi based router.
+Pi-first router admin UI using **Python + FastAPI + HTMX** (no npm needed on Pi runtime).
 
-## Current status
+## What it does
 
-Implemented:
-- Responsive dashboard shell
-- Sidebar navigation
-- System status cards
-- Connected clients discovery (`ip neigh` + `dnsmasq.leases` enrichment)
-- Client actions: block/unblock + static lease set/clear
-- Managed config apply for dnsmasq + nftables
-- Backup-first writes for state and managed config files
+- Live overview (CPU, memory, uptime, WAN IP)
+- Core service status (`hostapd`, `dnsmasq`, `nftables`)
+- Client discovery (`ip neigh` + `dnsmasq.leases`)
+- Client actions:
+  - Block / Unblock (managed nftables file)
+  - Set / Clear static lease (managed dnsmasq include)
+- Auto-backup before every state/config write
 
 ## Screenshots
 
-### Desktop dashboard
-
 ![PiRouterGUI desktop dashboard](docs/assets/dashboard-desktop.png)
-
-### Mobile layout
 
 ![PiRouterGUI mobile dashboard](docs/assets/dashboard-mobile.png)
 
-## Getting started
+## Run (Python)
 
 ```bash
-npm install
-npm run dev:api   # terminal 1 (API on :8080)
-npm run dev       # terminal 2 (UI on :5173)
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app:app --host 0.0.0.0 --port 8080
 ```
 
-Then open http://localhost:5173
+Open: `http://<pi-ip>:8080`
 
-## Safety behavior
+## Safety model
 
-- Every client action change auto-backs up previous state file to:
-  - `server/state/backups/client-actions-YYYYMMDD-HHMMSS.bak`
-- Managed system files are written separately (no primary config overwrite):
+- Runtime state file:
+  - `state/client-actions.json`
+- Backups:
+  - `state/backups/*.bak`
+- Managed config targets (separate files; no primary config overwrite):
   - `PRG_DNSMASQ_MANAGED_PATH` (default `/etc/dnsmasq.d/piroutergui-static.conf`)
   - `PRG_NFT_MANAGED_PATH` (default `/etc/nftables.d/piroutergui-blocklist.nft`)
-- Before each managed file write, existing file is backed up into `server/state/backups/`
-- Validation happens before reload/apply:
+- Validation before apply:
   - `dnsmasq --test`
   - `nft -c -f <managed file>`
-- Runtime state and backups are ignored by git.
 
-## Next steps
+## Legacy frontend/backend
 
-- Add authentication/session controls
-- Add stronger input validation + conflict checks for static IP assignment
-- Add router logs view + service restart controls
-- Add WAN/LAN/DHCP/Wi-Fi full config forms
+The old React/Node prototype is still in the repo for reference (`src/`, `server/`, Vite files), but the recommended path for Pi deployment is the Python app.

@@ -1,0 +1,56 @@
+{% set o = overview %}
+{% set s = o.stats %}
+<section class="toolbar">
+  <button hx-get="/partials/overview" hx-target="#overview">Refresh</button>
+  <button hx-post="/system/apply" hx-target="#overview">Apply Router Config</button>
+  {% if message %}<span class="msg">{{ message }}</span>{% endif %}
+</section>
+
+<section class="cards">
+  <article><small>CPU Load</small><strong>{{ s.cpuLoadPct }}%</strong></article>
+  <article><small>Memory</small><strong>{{ s.memUsedGb }} / {{ s.memTotalGb }} GB</strong></article>
+  <article><small>Uptime</small><strong>{{ (o.uptimeSec // 86400)|int }}d {{ ((o.uptimeSec % 86400) // 3600)|int }}h {{ ((o.uptimeSec % 3600) // 60)|int }}m</strong></article>
+  <article><small>WAN IP</small><strong>{{ s.wanIp }}</strong></article>
+</section>
+
+<section class="panel">
+  <h3>Core Services</h3>
+  <ul class="svc">
+    {% for name, status in o.services.items() %}
+      <li><span>{{ name }}</span><b class="{{ 'ok' if status == 'active' else 'bad' }}">{{ status }}</b></li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="panel">
+  <h3>Connected Clients</h3>
+  <table>
+    <thead>
+      <tr><th>Device</th><th>IP</th><th>MAC</th><th>Status</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+      {% for c in o.clients %}
+        <tr>
+          <td>{{ c.name }}</td><td>{{ c.ip }}</td><td>{{ c.mac }}</td>
+          <td><span class="{{ 'ok' if c.status == 'Online' else 'idle' }}">{{ c.status }}</span></td>
+          <td class="actions">
+            {% if c.mac != 'N/A' %}
+              {% if c.blocked %}
+                <button hx-post="/clients/{{ c.mac }}/unblock" hx-target="#overview">Unblock</button>
+              {% else %}
+                <button hx-post="/clients/{{ c.mac }}/block" hx-target="#overview">Block</button>
+              {% endif %}
+              <form hx-post="/clients/{{ c.mac }}/static-lease" hx-target="#overview">
+                <input name="ip" placeholder="192.168.8.50" value="{{ c.staticLeaseIp or '' }}" />
+                <button type="submit">Set Lease</button>
+              </form>
+              {% if c.staticLeaseIp %}
+                <button hx-post="/clients/{{ c.mac }}/static-lease/delete" hx-target="#overview">Clear</button>
+              {% endif %}
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
