@@ -1,0 +1,123 @@
+:root {
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  color: #dbe4ff;
+  background: #090e1f;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: radial-gradient(circle at top, #0f1630 0%, #090e1f 70%); }
+
+.app-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 260px 1fr;
+}
+
+.sidebar {
+  border-right: 1px solid #27325e;
+  padding: 28px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.sidebar h1 { margin: 0; font-size: 1.4rem; }
+.sidebar p { margin: 8px 0 0; font-size: 0.9rem; color: #9fafde; }
+
+nav { display: flex; flex-direction: column; gap: 10px; margin-top: 26px; }
+.nav-btn {
+  text-align: left;
+  border: 1px solid #24305e;
+  background: #10183a;
+  color: #c9d6ff;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.nav-btn.active {
+  background: #2b44a5;
+  border-color: #4d6ceb;
+  color: white;
+}
+
+.content { padding: 28px; }
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.header h2 { margin: 0; }
+.header span { color: #9fafde; font-size: 0.92rem; }
+
+.primary, .ghost {
+  border-radius: 10px;
+  padding: 10px 14px;
+  border: 1px solid #4363e6;
+  background: #4363e6;
+  color: white;
+  cursor: pointer;
+}
+.ghost {
+  background: transparent;
+  color: #bfd0ff;
+  border-color: #425289;
+}
+
+.cards {
+  margin-top: 22px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+.card {
+  border: 1px solid #293661;
+  background: #121a3b;
+  border-radius: 12px;
+  padding: 14px;
+  display: grid;
+  gap: 6px;
+}
+.card small { color: #9dafdf; }
+.card strong { font-size: 1.08rem; }
+
+.panel {
+  margin-top: 22px;
+  border: 1px solid #293661;
+  background: #101733;
+  border-radius: 12px;
+  padding: 14px;
+}
+.panel-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+th, td {
+  text-align: left;
+  padding: 10px 6px;
+  border-bottom: 1px solid #253058;
+}
+th { color: #9fafde; font-weight: 500; }
+
+.status {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid #7a839f;
+  font-size: 0.8rem;
+}
+.status.online {
+  border-color: #2ecc71;
+  color: #2ecc71;
+}
+
+@media (max-width: 860px) {
+  .app-shell { grid-template-columns: 1fr; }
+  .sidebar { border-right: none; border-bottom: 1px solid #27325e; }
+}
