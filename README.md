@@ -1,43 +1,55 @@
 # PiRouterGUI
 
-Pi-first router admin UI using **Python + FastAPI + HTMX**.
+Pi-first router admin UI built with **Python + FastAPI + HTMX**.
 
-## What it now covers
+## Current capabilities
 
-- Dashboard + service health (`hostapd`, `dnsmasq`, `nftables`, `piroutergui`)
-- Interfaces view (LAN/WLAN addresses + routes)
-- **Network config** (`wlan` interface + CIDR)
-- **Wi-Fi AP config** (SSID, passphrase, channel, hw mode) → writes hostapd config
-- **DHCP config** (interface, range, lease duration, static leases) → writes dnsmasq managed block
-- **Firewall isolation** toggle (`wlan <-> uplink` drop rules only, no global FORWARD policy flip) + persist with `iptables-save`
-- Client inventory from neighbors + leases + dnsmasq static host config + UI-added devices
-- Add/edit/remove static leases from UI
-- Monitoring panels (`hostapd_cli`, leases, neighbors, interfaces, routes)
-- Authenticated access (login/logout)
+- Service health dashboard (`hostapd`, `dnsmasq`, `nftables`, `piroutergui`)
+- Interfaces + routes view
+- **Network panel**: set Wi‑Fi interface + CIDR (`wlan0`, `192.168.50.1/24`)
+- **Wi‑Fi AP panel**: edit hostapd settings (SSID, passphrase, channel, hw mode)
+- **DHCP panel**: edit dnsmasq interface/range/lease + static leases
+- **Firewall panel**: toggle isolation rules between Wi‑Fi and uplink interfaces
+- Device inventory from:
+  - `ip neigh`
+  - `dnsmasq.leases`
+  - static `dhcp-host` entries
+  - PiRouterGUI-added devices
+- Per-device actions: block/unblock, set/clear static lease
+- Add new device form (MAC + IP + optional hostname)
+- Monitoring panels (hostapd stations, leases, neighbors, interfaces, routes)
+- Login authentication (cookie session)
+- Inline descriptions in each section (what it does + which file(s) it affects)
 
-## Screenshots (HTMX UI)
+## Screenshot
 
-![PiRouterGUI HTMX desktop dashboard](docs/assets/htmx-dashboard-desktop.png)
+![PiRouterGUI dashboard](docs/assets/htmx-dashboard-desktop.png)
 
-![PiRouterGUI HTMX mobile dashboard](docs/assets/htmx-dashboard-mobile.png)
-
-## Easiest Pi install (recommended)
+## One-command Pi install (recommended)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/wicksense/piroutergui/main/scripts/install-pi.sh | bash
 ```
 
-This will:
-- install system deps (`python3`, `hostapd`, `dnsmasq`, `iptables-persistent`, etc.)
-- clone/update repo in `~/piroutergui`
-- create `.venv` only if missing
-- install Python deps only if `requirements.txt` changed
-- install + start `piroutergui.service`
-- enable service on boot
+Installer behavior:
+- installs required packages (`python3`, `hostapd`, `dnsmasq`, `iptables-persistent`, etc.)
+- clones/updates repo to `~/piroutergui`
+- creates `.venv` only if missing
+- installs Python deps only when `requirements.txt` changes
+- installs + starts `piroutergui.service`
+- enables service on boot
 
 Open: `http://<pi-ip>:8080`
 
-## Service management
+## Updates
+
+```bash
+cd ~/piroutergui
+git pull --ff-only
+./scripts/install-pi.sh
+```
+
+## Service operations
 
 ```bash
 sudo systemctl status piroutergui
@@ -51,7 +63,7 @@ sudo journalctl -u piroutergui -f
 curl -fsSL https://raw.githubusercontent.com/wicksense/piroutergui/main/scripts/uninstall-pi.sh | bash
 ```
 
-Optional flags:
+Optional cleanup:
 
 ```bash
 REMOVE_APP_DIR=true curl -fsSL https://raw.githubusercontent.com/wicksense/piroutergui/main/scripts/uninstall-pi.sh | bash
@@ -66,17 +78,17 @@ Default credentials (change immediately):
 - Username: `admin`
 - Password: `change-me`
 
-Configured via systemd environment in `/etc/systemd/system/piroutergui.service`:
-- `PRG_AUTH_ENABLED=true|false`
-- `PRG_AUTH_USERNAME=...`
-- `PRG_AUTH_PASSWORD=...`
-- `PRG_AUTH_SECRET=...`
+Configured in `/etc/systemd/system/piroutergui.service` via:
+- `PRG_AUTH_ENABLED`
+- `PRG_AUTH_USERNAME`
+- `PRG_AUTH_PASSWORD`
+- `PRG_AUTH_SECRET`
 
-## Safety model
+## Safety / file writes
 
-- Backup before state/config writes: `state/backups/*.bak`
-- Managed config writes + validation/reload attempts
-- Core config paths (service env):
+- Backups are stored in: `state/backups/*.bak`
+- Service runs as root (needed for host network config writes)
+- Core config paths are environment-configurable:
   - `PRG_DNSMASQ_CONFIG_PATH` (default `/etc/dnsmasq.conf`)
   - `PRG_HOSTAPD_CONF_PATH` (default `/etc/hostapd/hostapd.conf`)
   - `PRG_HOSTAPD_DEFAULT_PATH` (default `/etc/default/hostapd`)
