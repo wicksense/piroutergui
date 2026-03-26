@@ -2,7 +2,16 @@ import { useEffect, useMemo, useState } from 'react';
 
 type NavKey = 'overview' | 'network' | 'wifi' | 'security' | 'system';
 
-type Client = { name: string; ip: string; type: string; status: string };
+type Client = {
+  name: string;
+  ip: string;
+  mac: string;
+  iface: string;
+  type: string;
+  status: string;
+  blocked: boolean;
+  staticLeaseIp: string | null;
+};
 
 type OverviewData = {
   node: string;
@@ -40,6 +49,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<NavKey>('overview');
   const [data, setData] = useState<OverviewData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [actionBusyMac, setActionBusyMac] = useState<string | null>(null);
 
   const fetchOverview = async () => {
     try {
@@ -57,6 +67,50 @@ export default function App() {
   useEffect(() => {
     void fetchOverview();
   }, []);
+
+  const runClientAction = async (mac: string, action: 'block' | 'unblock') => {
+    if (mac === 'N/A') return;
+    setActionBusyMac(mac);
+    try {
+      await fetch(`http://localhost:8080/api/clients/${encodeURIComponent(mac)}/${action}`, {
+        method: 'POST',
+      });
+      await fetchOverview();
+    } finally {
+      setActionBusyMac(null);
+    }
+  };
+
+  const setStaticLease = async (mac: string) => {
+    if (mac === 'N/A') return;
+    const ip = window.prompt('Set static lease IP (example: 192.168.8.50):');
+    if (!ip) return;
+
+    setActionBusyMac(mac);
+    try {
+      await fetch(`http://localhost:8080/api/clients/${encodeURIComponent(mac)}/static-lease`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ip }),
+      });
+      await fetchOverview();
+    } finally {
+      setActionBusyMac(null);
+    }
+  };
+
+  const clearStaticLease = async (mac: string) => {
+    if (mac === 'N/A') return;
+    setActionBusyMac(mac);
+    try {
+      await fetch(`http://localhost:8080/api/clients/${encodeURIComponent(mac)}/static-lease`, {
+        method: 'DELETE',
+      });
+      await fetchOverview();
+    } finally {
+      setActionBusyMac(null);
+    }
+  };
 
   const statCards = useMemo(() => {
     if (!data) {
@@ -128,8 +182,10 @@ export default function App() {
               <tr>
                 <th>Device</th>
                 <th>IP</th>
+                <th>MAC</th>
                 <th>Type</th>
                 <th>Status</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -137,11 +193,35 @@ export default function App() {
                 <tr key={client.ip}>
                   <td>{client.name}</td>
                   <td>{client.ip}</td>
+                  <td>{client.mac}</td>
                   <td>{client.type}</td>
                   <td>
                     <span className={client.status === 'Online' ? 'status online' : 'status'}>
                       {client.status}
                     </span>
+                  </td>
+                  <td>
+                    <div className="action-row">
+                      <button
+                        className="mini-btn"
+                        disabled={actionBusyMac === client.mac}
+                        onClick={() => void runClientAction(client.mac, client.blocked ? 'unblock' : 'block')}
+                      >
+                        {client.blocked ? 'Unblock' : 'Block'}
+                      </button>
+                      <button className="mini-btn" disabled={actionBusyMac === client.mac} onClick={() => void setStaticLease(client.mac)}>
+                        {client.staticLeaseIp ? `Static ${client.staticLeaseIp}` : 'Set Static'}
+                      </button>
+                      {client.staticLeaseIp && (
+                        <button
+                          className="mini-btn danger"
+                          disabled={actionBusyMac === client.mac}
+                          onClick={() => void clearStaticLease(client.mac)}
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

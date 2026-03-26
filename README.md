@@ -22,7 +22,8 @@ Then open http://localhost:5173
 
 ## Next steps
 
-- Add API layer for `hostapd`, `dnsmasq`, `nftables` and system metrics
+- Convert block/unblock to real firewall enforcement (nftables rules)
+- Convert static lease action to dnsmasq hostfile writes + service reload
 - Build auth/session handling
 - Add forms for WAN/LAN, DHCP, Wi-Fi, firewall, and QoS settings
 - Add live logs + service health panels

@@ -102,8 +102,35 @@ th, td {
   text-align: left;
   padding: 10px 6px;
   border-bottom: 1px solid #253058;
+  vertical-align: top;
 }
 th { color: #9fafde; font-weight: 500; }
+
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mini-btn {
+  border: 1px solid #425289;
+  background: transparent;
+  color: #bfd0ff;
+  border-radius: 8px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+
+.mini-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.mini-btn.danger {
+  border-color: #aa4b5e;
+  color: #ffb5c3;
+}
 
 .status {
   display: inline-block;

@@ -1,7 +1,15 @@
 import express from 'express';
 import cors from 'cors';
 import os from 'os';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const stateDir = path.join(__dirname, 'state');
+const statePath = path.join(stateDir, 'client-actions.json');
 
 const app = express();
 const port = process.env.PORT || 8080;
@@ -25,6 +33,24 @@ function getServiceStatus(serviceName) {
   return execText(`systemctl is-active ${serviceName}`) || 'unknown';
 }
 
+function loadState() {
+  try {
+    const raw = fs.readFileSync(statePath, 'utf8');
+    const parsed = JSON.parse(raw);
+    return {
+      blockedMacs: Array.isArray(parsed.blockedMacs) ? parsed.blockedMacs : [],
+      staticLeases: typeof parsed.staticLeases === 'object' && parsed.staticLeases ? parsed.staticLeases : {},
+    };
+  } catch {
+    return { blockedMacs: [], staticLeases: {} };
+  }
+}
+
+function saveState(state) {
+  fs.mkdirSync(stateDir, { recursive: true });
+  fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
+}
+
 function readDhcpLeases() {
   const leasesText = execText('cat /var/lib/misc/dnsmasq.leases');
   if (!leasesText) return new Map();
@@ -34,8 +60,6 @@ function readDhcpLeases() {
   for (const line of leasesText.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed) continue;
-
-    // dnsmasq format: <expiry> <mac> <ip> <hostname> <client-id>
     const parts = trimmed.split(/\s+/);
     if (parts.length < 4) continue;
 
@@ -64,18 +88,19 @@ function discoverClients() {
   if (!ipNeighText) return [];
 
   const leases = readDhcpLeases();
+  const state = loadState();
+  const blocked = new Set(state.blockedMacs.map((x) => String(x).toLowerCase()));
   const clients = [];
 
   for (const line of ipNeighText.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed) continue;
 
-    // Example: 192.168.8.21 dev wlan0 lladdr 12:34:56:78:9a:bc REACHABLE
     const parts = trimmed.split(/\s+/);
     const ip = parts[0];
     if (!ip || ip === 'N/A') continue;
 
-    const state = parts.at(-1) || 'UNKNOWN';
+    const stateLabel = parts.at(-1) || 'UNKNOWN';
     const macIdx = parts.indexOf('lladdr');
     const mac = macIdx >= 0 && parts[macIdx + 1] ? parts[macIdx + 1].toLowerCase() : '';
     const devIdx = parts.indexOf('dev');
@@ -84,19 +109,22 @@ function discoverClients() {
     const lease = leases.get(ip);
     const hostname = lease?.hostname;
 
-    if (state === 'FAILED' || state === 'INCOMPLETE') continue;
+    if (stateLabel === 'FAILED' || stateLabel === 'INCOMPLETE') continue;
+
+    const resolvedMac = mac || lease?.mac || 'N/A';
 
     clients.push({
       name: hostname || `client-${ip.split('.').at(-1)}`,
       ip,
-      mac: mac || lease?.mac || 'N/A',
+      mac: resolvedMac,
       iface,
       type: inferDeviceType(hostname || ''),
-      status: state === 'STALE' ? 'Idle' : 'Online',
+      status: stateLabel === 'STALE' ? 'Idle' : 'Online',
+      blocked: resolvedMac !== 'N/A' ? blocked.has(resolvedMac.toLowerCase()) : false,
+      staticLeaseIp: resolvedMac !== 'N/A' ? state.staticLeases[resolvedMac.toLowerCase()] || null : null,
     });
   }
 
-  // De-duplicate by IP
   const uniqueByIp = new Map();
   for (const client of clients) uniqueByIp.set(client.ip, client);
 
@@ -115,7 +143,7 @@ app.get('/api/overview', (_req, res) => {
   const usedMemGb = totalMemGb - os.freemem() / 1024 / 1024 / 1024;
   const clients = discoverClients();
 
-  const payload = {
+  res.json({
     node: os.hostname(),
     uptimeSec: os.uptime(),
     stats: {
@@ -130,9 +158,48 @@ app.get('/api/overview', (_req, res) => {
       nftables: getServiceStatus('nftables'),
     },
     clients,
-  };
+  });
+});
 
-  res.json(payload);
+app.post('/api/clients/:mac/block', (req, res) => {
+  const mac = String(req.params.mac || '').toLowerCase();
+  if (!mac) return res.status(400).json({ error: 'Invalid mac' });
+
+  const state = loadState();
+  if (!state.blockedMacs.includes(mac)) state.blockedMacs.push(mac);
+  saveState(state);
+  return res.json({ ok: true, mac, blocked: true });
+});
+
+app.post('/api/clients/:mac/unblock', (req, res) => {
+  const mac = String(req.params.mac || '').toLowerCase();
+  if (!mac) return res.status(400).json({ error: 'Invalid mac' });
+
+  const state = loadState();
+  state.blockedMacs = state.blockedMacs.filter((m) => m !== mac);
+  saveState(state);
+  return res.json({ ok: true, mac, blocked: false });
+});
+
+app.post('/api/clients/:mac/static-lease', (req, res) => {
+  const mac = String(req.params.mac || '').toLowerCase();
+  const ip = String(req.body?.ip || '').trim();
+  if (!mac || !ip) return res.status(400).json({ error: 'Invalid mac or ip' });
+
+  const state = loadState();
+  state.staticLeases[mac] = ip;
+  saveState(state);
+  return res.json({ ok: true, mac, ip });
+});
+
+app.delete('/api/clients/:mac/static-lease', (req, res) => {
+  const mac = String(req.params.mac || '').toLowerCase();
+  if (!mac) return res.status(400).json({ error: 'Invalid mac' });
+
+  const state = loadState();
+  delete state.staticLeases[mac];
+  saveState(state);
+  return res.json({ ok: true, mac });
 });
 
 app.listen(port, () => {
