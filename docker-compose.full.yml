@@ -1,0 +1,22 @@
+services:
+  piroutergui:
+    build: .
+    container_name: piroutergui
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    volumes:
+      - ./state:/app/state
+      - /etc/dnsmasq.d:/etc/dnsmasq.d
+      - /etc/nftables.d:/etc/nftables.d
+      - /run/systemd:/run/systemd:ro
+      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
+    environment:
+      - PRG_DNSMASQ_MANAGED_PATH=/etc/dnsmasq.d/piroutergui-static.conf
+      - PRG_NFT_MANAGED_PATH=/etc/nftables.d/piroutergui-blocklist.nft
+      - PRG_DNSMASQ_RELOAD_CMD=systemctl reload dnsmasq
+      - PRG_NFT_APPLY_CMD=nft -f /etc/nftables.d/piroutergui-blocklist.nft
+      - PYTHONUNBUFFERED=1
+    privileged: true

@@ -1,6 +1,6 @@
 # PiRouterGUI
 
-Pi-first router admin UI using **Python + FastAPI + HTMX** (no npm needed on Pi runtime).
+Pi-first router admin UI using **Python + FastAPI + HTMX**.
 
 ## What it does
 
@@ -12,13 +12,13 @@ Pi-first router admin UI using **Python + FastAPI + HTMX** (no npm needed on Pi 
   - Set / Clear static lease (managed dnsmasq include)
 - Auto-backup before every state/config write
 
-## Screenshots
+## Screenshots (current HTMX UI)
 
-![PiRouterGUI desktop dashboard](docs/assets/dashboard-desktop.png)
+![PiRouterGUI HTMX desktop dashboard](docs/assets/htmx-dashboard-desktop.png)
 
-![PiRouterGUI mobile dashboard](docs/assets/dashboard-mobile.png)
+![PiRouterGUI HTMX mobile dashboard](docs/assets/htmx-dashboard-mobile.png)
 
-## Run (Python)
+## Run locally (Python)
 
 ```bash
 python3 -m venv .venv
@@ -28,6 +28,44 @@ uvicorn app:app --host 0.0.0.0 --port 8080
 ```
 
 Open: `http://<pi-ip>:8080`
+
+---
+
+## Docker deployment (FULL MODE)
+
+⚠️ Full mode grants container host-level networking control.
+Use only on a trusted Pi you control.
+
+### 1) Start
+
+```bash
+git pull
+sudo docker compose -f docker-compose.full.yml up -d --build
+```
+
+### 2) Open UI
+
+`http://<pi-ip>:8080`
+
+### Full mode details
+
+- `network_mode: host`
+- `privileged: true`
+- `cap_add: NET_ADMIN, NET_RAW`
+- Mounts host config paths:
+  - `/etc/dnsmasq.d`
+  - `/etc/nftables.d`
+- Mounts runtime state:
+  - `./state:/app/state`
+
+### Verify container
+
+```bash
+sudo docker compose -f docker-compose.full.yml ps
+sudo docker compose -f docker-compose.full.yml logs -f
+```
+
+---
 
 ## Safety model
 
@@ -42,6 +80,6 @@ Open: `http://<pi-ip>:8080`
   - `dnsmasq --test`
   - `nft -c -f <managed file>`
 
-## Legacy frontend/backend
+## Legacy prototype note
 
-The old React/Node prototype is still in the repo for reference (`src/`, `server/`, Vite files), but the recommended path for Pi deployment is the Python app.
+The previous React/Node prototype still exists in the repo for reference (`src/`, `server/`, Vite files), but the recommended deployment path is this Python/HTMX stack.
