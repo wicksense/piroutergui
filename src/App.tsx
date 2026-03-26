@@ -50,6 +50,7 @@ export default function App() {
   const [data, setData] = useState<OverviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionBusyMac, setActionBusyMac] = useState<string | null>(null);
+  const [applyMessage, setApplyMessage] = useState<string>('');
 
   const fetchOverview = async () => {
     try {
@@ -78,6 +79,23 @@ export default function App() {
       await fetchOverview();
     } finally {
       setActionBusyMac(null);
+    }
+  };
+
+  const applyManagedConfig = async () => {
+    setApplyMessage('Applying managed config...');
+    try {
+      const res = await fetch('http://localhost:8080/api/system/apply', { method: 'POST' });
+      const json = (await res.json()) as { applyResult?: { dnsmasq?: { error?: string | null }; nftables?: { error?: string | null } } };
+      const dnsErr = json.applyResult?.dnsmasq?.error;
+      const nftErr = json.applyResult?.nftables?.error;
+      if (!dnsErr && !nftErr) {
+        setApplyMessage('Managed config applied successfully.');
+      } else {
+        setApplyMessage(`Applied with warnings: ${dnsErr ?? 'dnsmasq ok'} | ${nftErr ?? 'nftables ok'}`);
+      }
+    } catch {
+      setApplyMessage('Apply failed: unable to reach API.');
     }
   };
 
@@ -155,10 +173,16 @@ export default function App() {
           <div>
             <h2>{navItems.find((item) => item.key === activeTab)?.label}</h2>
             <span>Node: {data?.node ?? 'pi-router.local'}</span>
+            {applyMessage && <div className="apply-msg">{applyMessage}</div>}
           </div>
-          <button className="primary" onClick={() => void fetchOverview()}>
-            {loading ? 'Refreshing...' : 'Refresh Data'}
-          </button>
+          <div className="header-actions">
+            <button className="ghost" onClick={() => void applyManagedConfig()}>
+              Apply Router Config
+            </button>
+            <button className="primary" onClick={() => void fetchOverview()}>
+              {loading ? 'Refreshing...' : 'Refresh Data'}
+            </button>
+          </div>
         </header>
 
         <section className="cards">

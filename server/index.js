@@ -12,6 +12,11 @@ const stateDir = path.join(__dirname, 'state');
 const backupDir = path.join(stateDir, 'backups');
 const statePath = path.join(stateDir, 'client-actions.json');
 
+const DNSMASQ_MANAGED_PATH = process.env.PRG_DNSMASQ_MANAGED_PATH || '/etc/dnsmasq.d/piroutergui-static.conf';
+const NFT_MANAGED_PATH = process.env.PRG_NFT_MANAGED_PATH || '/etc/nftables.d/piroutergui-blocklist.nft';
+const DNSMASQ_RELOAD_CMD = process.env.PRG_DNSMASQ_RELOAD_CMD || 'systemctl reload dnsmasq';
+const NFT_APPLY_CMD = process.env.PRG_NFT_APPLY_CMD || `nft -f ${NFT_MANAGED_PATH}`;
+
 const app = express();
 const port = process.env.PORT || 8080;
 
@@ -26,12 +31,34 @@ function execText(command) {
   }
 }
 
-function getWanIp() {
-  return execText('curl -s --max-time 2 https://ifconfig.me') || 'N/A';
+function runCommand(command) {
+  try {
+    const output = execSync(command, { stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim();
+    return { ok: true, output };
+  } catch (error) {
+    const stderr = error?.stderr?.toString?.().trim?.() || '';
+    return { ok: false, error: stderr || error?.message || 'command failed' };
+  }
 }
 
-function getServiceStatus(serviceName) {
-  return execText(`systemctl is-active ${serviceName}`) || 'unknown';
+function makeTimestamp() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+}
+
+function backupFileIfExists(filePath, prefix) {
+  if (!fs.existsSync(filePath)) return null;
+
+  fs.mkdirSync(backupDir, { recursive: true });
+  const safePrefix = prefix.replace(/[^a-z0-9_-]/gi, '-');
+  const backupPath = path.join(backupDir, `${safePrefix}-${makeTimestamp()}.bak`);
+  fs.copyFileSync(filePath, backupPath);
+  return backupPath;
+}
+
+function ensureParentDir(filePath) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
 }
 
 function loadState() {
@@ -47,26 +74,104 @@ function loadState() {
   }
 }
 
-function makeTimestamp() {
-  const d = new Date();
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
-}
-
-function backupFileIfExists(filePath, prefix) {
-  if (!fs.existsSync(filePath)) return null;
-
-  fs.mkdirSync(backupDir, { recursive: true });
-  const backupPath = path.join(backupDir, `${prefix}-${makeTimestamp()}.bak`);
-  fs.copyFileSync(filePath, backupPath);
-  return backupPath;
-}
-
 function saveState(state) {
   fs.mkdirSync(stateDir, { recursive: true });
   const backupPath = backupFileIfExists(statePath, 'client-actions');
   fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
   return backupPath;
+}
+
+function buildDnsmasqManaged(staticLeases) {
+  const lines = ['# Managed by PiRouterGUI. Do not edit manually.'];
+  for (const [mac, ip] of Object.entries(staticLeases)) {
+    if (!mac || !ip) continue;
+    lines.push(`dhcp-host=${String(mac).toLowerCase()},${String(ip).trim()}`);
+  }
+  return `${lines.join('\n')}\n`;
+}
+
+function buildNftManaged(blockedMacs) {
+  const lines = [
+    '#!/usr/sbin/nft -f',
+    '# Managed by PiRouterGUI. Do not edit manually.',
+    'table inet piroutergui {',
+    '  set blocked_macs {',
+    '    type ether_addr',
+    '    flags interval',
+    '    elements = {',
+  ];
+
+  const normalized = blockedMacs
+    .map((x) => String(x).toLowerCase())
+    .filter(Boolean)
+    .sort();
+
+  if (normalized.length) {
+    lines.push(`      ${normalized.join(', ')}`);
+  }
+
+  lines.push('    }');
+  lines.push('  }');
+  lines.push('  chain forward {');
+  lines.push('    type filter hook forward priority 0; policy accept;');
+  lines.push('    ether saddr @blocked_macs drop');
+  lines.push('  }');
+  lines.push('}');
+
+  return `${lines.join('\n')}\n`;
+}
+
+function applyManagedConfigs(state) {
+  const result = {
+    dnsmasq: { target: DNSMASQ_MANAGED_PATH, updated: false, backupPath: null, validated: false, reloaded: false, error: null },
+    nftables: { target: NFT_MANAGED_PATH, updated: false, backupPath: null, validated: false, applied: false, error: null },
+  };
+
+  try {
+    const dnsText = buildDnsmasqManaged(state.staticLeases);
+    ensureParentDir(DNSMASQ_MANAGED_PATH);
+    result.dnsmasq.backupPath = backupFileIfExists(DNSMASQ_MANAGED_PATH, 'dnsmasq-managed');
+    fs.writeFileSync(DNSMASQ_MANAGED_PATH, dnsText);
+    result.dnsmasq.updated = true;
+
+    const dnsCheck = runCommand('dnsmasq --test');
+    if (!dnsCheck.ok) throw new Error(`dnsmasq validation failed: ${dnsCheck.error}`);
+    result.dnsmasq.validated = true;
+
+    const reload = runCommand(DNSMASQ_RELOAD_CMD);
+    if (!reload.ok) throw new Error(`dnsmasq reload failed: ${reload.error}`);
+    result.dnsmasq.reloaded = true;
+  } catch (error) {
+    result.dnsmasq.error = error?.message || 'failed to update dnsmasq managed file';
+  }
+
+  try {
+    const nftText = buildNftManaged(state.blockedMacs);
+    ensureParentDir(NFT_MANAGED_PATH);
+    result.nftables.backupPath = backupFileIfExists(NFT_MANAGED_PATH, 'nft-managed');
+    fs.writeFileSync(NFT_MANAGED_PATH, nftText);
+    result.nftables.updated = true;
+
+    const nftCheck = runCommand(`nft -c -f ${NFT_MANAGED_PATH}`);
+    if (!nftCheck.ok) throw new Error(`nft validation failed: ${nftCheck.error}`);
+    result.nftables.validated = true;
+
+    const apply = runCommand(NFT_APPLY_CMD);
+    if (!apply.ok) throw new Error(`nft apply failed: ${apply.error}`);
+    result.nftables.applied = true;
+  } catch (error) {
+    result.nftables.error = error?.message || 'failed to update nftables managed file';
+  }
+
+  return result;
+}
+
+function getWanIp() {
+  return execText('curl -s --max-time 2 https://ifconfig.me') || 'N/A';
+}
+
+function getServiceStatus(serviceName) {
+  return execText(`systemctl is-active ${serviceName}`) || 'unknown';
 }
 
 function readDhcpLeases() {
@@ -179,6 +284,12 @@ app.get('/api/overview', (_req, res) => {
   });
 });
 
+app.post('/api/system/apply', (_req, res) => {
+  const state = loadState();
+  const applyResult = applyManagedConfigs(state);
+  return res.json({ ok: true, applyResult });
+});
+
 app.post('/api/clients/:mac/block', (req, res) => {
   const mac = String(req.params.mac || '').toLowerCase();
   if (!mac) return res.status(400).json({ error: 'Invalid mac' });
@@ -186,7 +297,8 @@ app.post('/api/clients/:mac/block', (req, res) => {
   const state = loadState();
   if (!state.blockedMacs.includes(mac)) state.blockedMacs.push(mac);
   const backupPath = saveState(state);
-  return res.json({ ok: true, mac, blocked: true, backupPath });
+  const applyResult = applyManagedConfigs(state);
+  return res.json({ ok: true, mac, blocked: true, backupPath, applyResult });
 });
 
 app.post('/api/clients/:mac/unblock', (req, res) => {
@@ -196,7 +308,8 @@ app.post('/api/clients/:mac/unblock', (req, res) => {
   const state = loadState();
   state.blockedMacs = state.blockedMacs.filter((m) => m !== mac);
   const backupPath = saveState(state);
-  return res.json({ ok: true, mac, blocked: false, backupPath });
+  const applyResult = applyManagedConfigs(state);
+  return res.json({ ok: true, mac, blocked: false, backupPath, applyResult });
 });
 
 app.post('/api/clients/:mac/static-lease', (req, res) => {
@@ -207,7 +320,8 @@ app.post('/api/clients/:mac/static-lease', (req, res) => {
   const state = loadState();
   state.staticLeases[mac] = ip;
   const backupPath = saveState(state);
-  return res.json({ ok: true, mac, ip, backupPath });
+  const applyResult = applyManagedConfigs(state);
+  return res.json({ ok: true, mac, ip, backupPath, applyResult });
 });
 
 app.delete('/api/clients/:mac/static-lease', (req, res) => {
@@ -217,7 +331,8 @@ app.delete('/api/clients/:mac/static-lease', (req, res) => {
   const state = loadState();
   delete state.staticLeases[mac];
   const backupPath = saveState(state);
-  return res.json({ ok: true, mac, backupPath });
+  const applyResult = applyManagedConfigs(state);
+  return res.json({ ok: true, mac, backupPath, applyResult });
 });
 
 app.listen(port, () => {

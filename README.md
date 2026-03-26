@@ -24,6 +24,13 @@ Then open http://localhost:5173
 
 - Every client action change auto-backs up previous state file to:
   - `server/state/backups/client-actions-YYYYMMDD-HHMMSS.bak`
+- Managed system files are written separately (no primary config overwrite):
+  - `PRG_DNSMASQ_MANAGED_PATH` (default `/etc/dnsmasq.d/piroutergui-static.conf`)
+  - `PRG_NFT_MANAGED_PATH` (default `/etc/nftables.d/piroutergui-blocklist.nft`)
+- Before each managed file write, existing file is backed up into `server/state/backups/`
+- Validation happens before reload/apply:
+  - `dnsmasq --test`
+  - `nft -c -f <managed file>`
 - Runtime state and backups are ignored by git.
 
 ## Next steps
