@@ -43,6 +43,22 @@ sudo systemctl restart piroutergui
 sudo journalctl -u piroutergui -f
 ```
 
+### Uninstall
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/wicksense/piroutergui/main/scripts/uninstall-pi.sh | bash
+```
+
+Optional flags:
+
+```bash
+# remove app dir too
+REMOVE_APP_DIR=true curl -fsSL https://raw.githubusercontent.com/wicksense/piroutergui/main/scripts/uninstall-pi.sh | bash
+
+# remove app dir + state/backups
+REMOVE_APP_DIR=true REMOVE_STATE=true curl -fsSL https://raw.githubusercontent.com/wicksense/piroutergui/main/scripts/uninstall-pi.sh | bash
+```
+
 ## Manual run (Python)
 
 ```bash
