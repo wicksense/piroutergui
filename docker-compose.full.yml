@@ -7,16 +7,25 @@ services:
     cap_add:
       - NET_ADMIN
       - NET_RAW
+    privileged: true
     volumes:
       - ./state:/app/state
-      - /etc/dnsmasq.d:/etc/dnsmasq.d
+      - /etc/dnsmasq.conf:/etc/dnsmasq.conf
+      - /etc/hostapd:/etc/hostapd
+      - /etc/default/hostapd:/etc/default/hostapd
+      - /etc/rc.local:/etc/rc.local
+      - /etc/iptables:/etc/iptables
       - /etc/nftables.d:/etc/nftables.d
       - /run/systemd:/run/systemd:ro
       - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
     environment:
-      - PRG_DNSMASQ_MANAGED_PATH=/etc/dnsmasq.d/piroutergui-static.conf
+      - PRG_DNSMASQ_CONFIG_PATH=/etc/dnsmasq.conf
+      - PRG_HOSTAPD_CONF_PATH=/etc/hostapd/hostapd.conf
+      - PRG_HOSTAPD_DEFAULT_PATH=/etc/default/hostapd
+      - PRG_RC_LOCAL_PATH=/etc/rc.local
+      - PRG_IPTABLES_RULES_PATH=/etc/iptables/rules.v4
       - PRG_NFT_MANAGED_PATH=/etc/nftables.d/piroutergui-blocklist.nft
       - PRG_DNSMASQ_RELOAD_CMD=systemctl reload dnsmasq
+      - PRG_HOSTAPD_RESTART_CMD=systemctl restart hostapd
       - PRG_NFT_APPLY_CMD=nft -f /etc/nftables.d/piroutergui-blocklist.nft
       - PYTHONUNBUFFERED=1
-    privileged: true

@@ -2,17 +2,20 @@
 
 Pi-first router admin UI using **Python + FastAPI + HTMX**.
 
-## What it does
+## What it now covers
 
-- Live overview (CPU, memory, uptime, WAN IP)
-- Core service status (`hostapd`, `dnsmasq`, `nftables`)
-- Client discovery (`ip neigh` + `dnsmasq.leases` + static `dhcp-host` entries from dnsmasq config)
-- Client actions:
-  - Block / Unblock (managed nftables file)
-  - Set / Clear static lease (managed dnsmasq include)
-- Auto-backup before every state/config write
+- Dashboard + service health (`hostapd`, `dnsmasq`, `nftables`, `piroutergui`)
+- Interfaces view (LAN/WLAN addresses + routes)
+- **Network config** (`wlan` CIDR + uplink/wlan interface pairing)
+- **Wi-Fi AP config** (SSID, passphrase, channel, hw mode) → writes hostapd config
+- **DHCP config** (interface, range, lease duration, static leases) → writes dnsmasq managed block
+- **Firewall isolation** toggle (`wlan <-> uplink` block rules) + persist with `iptables-save`
+- Client inventory from neighbors + leases + dnsmasq static host config + UI-added devices
+- Add/edit/remove static leases from UI
+- Monitoring panels (`hostapd_cli`, leases, neighbors, interfaces, routes)
+- Authenticated access (login/logout)
 
-## Screenshots (current HTMX UI)
+## Screenshots (HTMX UI)
 
 ![PiRouterGUI HTMX desktop dashboard](docs/assets/htmx-dashboard-desktop.png)
 
@@ -20,23 +23,21 @@ Pi-first router admin UI using **Python + FastAPI + HTMX**.
 
 ## Easiest Pi install (recommended)
 
-One command:
-
 ```bash
 curl -fsSL https://raw.githubusercontent.com/wicksense/piroutergui/main/scripts/install-pi.sh | bash
 ```
 
 This will:
-- install Python/git dependencies
-- clone or update the repo in `~/piroutergui`
+- install system deps (`python3`, `hostapd`, `dnsmasq`, `iptables-persistent`, etc.)
+- clone/update repo in `~/piroutergui`
 - create `.venv` only if missing
-- install Python deps only when `requirements.txt` changes
-- install and start `piroutergui.service`
-- enable auto-start on boot
+- install Python deps only if `requirements.txt` changed
+- install + start `piroutergui.service`
+- enable service on boot
 
-Then open: `http://<pi-ip>:8080`
+Open: `http://<pi-ip>:8080`
 
-### Service management
+## Service management
 
 ```bash
 sudo systemctl status piroutergui
@@ -44,7 +45,7 @@ sudo systemctl restart piroutergui
 sudo journalctl -u piroutergui -f
 ```
 
-### Uninstall
+## Uninstall
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/wicksense/piroutergui/main/scripts/uninstall-pi.sh | bash
@@ -53,80 +54,19 @@ curl -fsSL https://raw.githubusercontent.com/wicksense/piroutergui/main/scripts/
 Optional flags:
 
 ```bash
-# remove app dir too
 REMOVE_APP_DIR=true curl -fsSL https://raw.githubusercontent.com/wicksense/piroutergui/main/scripts/uninstall-pi.sh | bash
-
-# remove app dir + state/backups
 REMOVE_APP_DIR=true REMOVE_STATE=true curl -fsSL https://raw.githubusercontent.com/wicksense/piroutergui/main/scripts/uninstall-pi.sh | bash
 ```
 
-## Manual run (Python)
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app:app --host 0.0.0.0 --port 8080
-```
-
-Open: `http://<pi-ip>:8080`
-
----
-
-## Docker deployment (FULL MODE)
-
-⚠️ Full mode grants container host-level networking control.
-Use only on a trusted Pi you control.
-
-### 1) First-time setup (clone)
-
-```bash
-git clone https://github.com/wicksense/piroutergui.git
-cd piroutergui
-sudo docker compose -f docker-compose.full.yml up -d --build
-```
-
-### 2) Updates later
-
-```bash
-cd piroutergui
-git pull
-sudo docker compose -f docker-compose.full.yml up -d --build
-```
-
-### 2) Open UI
-
-`http://<pi-ip>:8080`
-
-### Full mode details
-
-- `network_mode: host`
-- `privileged: true`
-- `cap_add: NET_ADMIN, NET_RAW`
-- Mounts host config paths:
-  - `/etc/dnsmasq.d`
-  - `/etc/nftables.d`
-- Mounts runtime state:
-  - `./state:/app/state`
-
-### Verify container
-
-```bash
-sudo docker compose -f docker-compose.full.yml ps
-sudo docker compose -f docker-compose.full.yml logs -f
-```
-
----
-
 ## Authentication
 
-Authentication is enabled by default.
+Enabled by default.
 
-Default login:
+Default credentials (change immediately):
 - Username: `admin`
 - Password: `change-me`
 
-Set secure credentials via service environment:
+Configured via systemd environment in `/etc/systemd/system/piroutergui.service`:
 - `PRG_AUTH_ENABLED=true|false`
 - `PRG_AUTH_USERNAME=...`
 - `PRG_AUTH_PASSWORD=...`
@@ -134,14 +74,20 @@ Set secure credentials via service environment:
 
 ## Safety model
 
-- Runtime state file:
-  - `state/client-actions.json`
-- Backups:
-  - `state/backups/*.bak`
-- Managed config targets (separate files; no primary config overwrite):
-  - `PRG_DNSMASQ_MANAGED_PATH` (default `/etc/dnsmasq.d/piroutergui-static.conf`)
+- Backup before state/config writes: `state/backups/*.bak`
+- Managed config writes + validation/reload attempts
+- Core config paths (service env):
+  - `PRG_DNSMASQ_CONFIG_PATH` (default `/etc/dnsmasq.conf`)
+  - `PRG_HOSTAPD_CONF_PATH` (default `/etc/hostapd/hostapd.conf`)
+  - `PRG_HOSTAPD_DEFAULT_PATH` (default `/etc/default/hostapd`)
+  - `PRG_RC_LOCAL_PATH` (default `/etc/rc.local`)
+  - `PRG_IPTABLES_RULES_PATH` (default `/etc/iptables/rules.v4`)
   - `PRG_NFT_MANAGED_PATH` (default `/etc/nftables.d/piroutergui-blocklist.nft`)
-- Validation before apply:
-  - `dnsmasq --test`
-  - `nft -c -f <managed file>`
 
+## Docker (full-control mode)
+
+```bash
+git clone https://github.com/wicksense/piroutergui.git
+cd piroutergui
+sudo docker compose -f docker-compose.full.yml up -d --build
+```

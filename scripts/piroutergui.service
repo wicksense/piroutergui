@@ -5,18 +5,27 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=__USER__
+User=root
 WorkingDirectory=__WORKDIR__
 ExecStart=__WORKDIR__/.venv/bin/uvicorn app:app --host 0.0.0.0 --port 8080
 Restart=always
 RestartSec=3
 Environment=PYTHONUNBUFFERED=1
 
-# Full-mode managed config targets
-Environment=PRG_DNSMASQ_MANAGED_PATH=/etc/dnsmasq.d/piroutergui-static.conf
+# Core config paths
+Environment=PRG_DNSMASQ_CONFIG_PATH=/etc/dnsmasq.conf
+Environment=PRG_HOSTAPD_CONF_PATH=/etc/hostapd/hostapd.conf
+Environment=PRG_HOSTAPD_DEFAULT_PATH=/etc/default/hostapd
+Environment=PRG_RC_LOCAL_PATH=/etc/rc.local
+Environment=PRG_IPTABLES_RULES_PATH=/etc/iptables/rules.v4
 Environment=PRG_NFT_MANAGED_PATH=/etc/nftables.d/piroutergui-blocklist.nft
+
+# Apply commands
 Environment="PRG_DNSMASQ_RELOAD_CMD=systemctl reload dnsmasq"
+Environment="PRG_HOSTAPD_RESTART_CMD=systemctl restart hostapd"
 Environment="PRG_NFT_APPLY_CMD=nft -f /etc/nftables.d/piroutergui-blocklist.nft"
+
+# Authentication
 Environment="PRG_AUTH_ENABLED=true"
 Environment="PRG_AUTH_USERNAME=admin"
 Environment="PRG_AUTH_PASSWORD=change-me"

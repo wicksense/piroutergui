@@ -4,7 +4,6 @@ set -euo pipefail
 REPO_DIR="${REPO_DIR:-$HOME/piroutergui}"
 REPO_URL="${REPO_URL:-https://github.com/wicksense/piroutergui.git}"
 SERVICE_NAME="piroutergui"
-RUN_USER="${SUDO_USER:-$USER}"
 INSTALL_STATE_DIR="$REPO_DIR/.install-state"
 REQ_HASH_FILE="$INSTALL_STATE_DIR/requirements.sha256"
 
@@ -14,7 +13,7 @@ hash_requirements() {
 
 echo "[1/7] Installing system packages..."
 sudo apt-get update -y
-sudo apt-get install -y python3 python3-venv python3-pip git
+sudo apt-get install -y python3 python3-venv python3-pip git hostapd dnsmasq iptables-persistent
 
 echo "[2/7] Cloning/updating repository..."
 if [ -d "$REPO_DIR/.git" ]; then
@@ -51,7 +50,6 @@ fi
 echo "[5/7] Installing systemd service..."
 sudo cp "$REPO_DIR/scripts/piroutergui.service" "/etc/systemd/system/${SERVICE_NAME}.service"
 sudo sed -i "s|__WORKDIR__|$REPO_DIR|g" "/etc/systemd/system/${SERVICE_NAME}.service"
-sudo sed -i "s|__USER__|$RUN_USER|g" "/etc/systemd/system/${SERVICE_NAME}.service"
 
 echo "[6/7] Enabling + starting service..."
 sudo systemctl daemon-reload

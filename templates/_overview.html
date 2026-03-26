@@ -2,7 +2,7 @@
 {% set s = o.stats %}
 <section class="toolbar">
   <button hx-get="/partials/overview" hx-target="#overview">Refresh</button>
-  <button hx-post="/system/apply" hx-target="#overview">Apply Router Config</button>
+  <button hx-post="/system/apply" hx-target="#overview">Apply All</button>
   <form action="/logout" method="post"><button type="submit">Logout</button></form>
   {% if message %}<span class="msg">{{ message }}</span>{% endif %}
 </section>
@@ -15,12 +15,62 @@
 </section>
 
 <section class="panel">
-  <h3>Core Services</h3>
+  <h3>Services</h3>
   <ul class="svc">
     {% for name, status in o.services.items() %}
       <li><span>{{ name }}</span><b class="{{ 'ok' if status == 'active' else 'bad' }}">{{ status }}</b></li>
     {% endfor %}
   </ul>
+</section>
+
+<section class="panel">
+  <h3>Interfaces & Networks</h3>
+  {% if o.networks %}<p class="networks">Detected routes: {{ o.networks | join(', ') }}</p>{% endif %}
+  <div class="iface-grid">
+    {% for i in o.interfaces %}
+      <div class="iface-item"><strong>{{ i.name }}</strong><span>{{ i.cidr }}</span></div>
+    {% endfor %}
+  </div>
+  <form class="add-device" hx-post="/network/apply" hx-target="#overview">
+    <input name="wlan_iface" value="{{ o.network.wlanIface }}" placeholder="wlan0" required />
+    <input name="uplink_iface" value="{{ o.network.uplinkIface }}" placeholder="eth0" required />
+    <input name="wlan_cidr" value="{{ o.network.wlanCidr }}" placeholder="192.168.50.1/24" required />
+    <button type="submit">Apply Network</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h3>Wi-Fi AP (hostapd)</h3>
+  <form class="add-device" hx-post="/wifi/apply" hx-target="#overview">
+    <input name="interface" value="{{ o.wifi.interface }}" placeholder="wlan0" required />
+    <input name="ssid" value="{{ o.wifi.ssid }}" placeholder="SSID" required />
+    <input name="passphrase" value="{{ o.wifi.wpaPassphrase }}" placeholder="WPA passphrase" required />
+    <input name="channel" value="{{ o.wifi.channel }}" placeholder="6" required />
+    <input name="hw_mode" value="{{ o.wifi.hwMode }}" placeholder="g" required />
+    <button type="submit">Apply Wi-Fi</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h3>DHCP (dnsmasq)</h3>
+  <form class="add-device" hx-post="/dhcp/apply" hx-target="#overview">
+    <input name="interface" value="{{ o.dhcp.interface }}" placeholder="wlan0" required />
+    <input name="range_start" value="{{ o.dhcp.rangeStart }}" placeholder="192.168.50.10" required />
+    <input name="range_end" value="{{ o.dhcp.rangeEnd }}" placeholder="192.168.50.100" required />
+    <input name="netmask" value="{{ o.dhcp.netmask }}" placeholder="255.255.255.0" required />
+    <input name="lease_time" value="{{ o.dhcp.leaseTime }}" placeholder="24h" required />
+    <button type="submit">Apply DHCP</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h3>Firewall Isolation</h3>
+  <form class="add-device" hx-post="/firewall/apply" hx-target="#overview">
+    <input name="wifi_iface" value="{{ o.firewall.wifiIface }}" placeholder="wlan0" required />
+    <input name="uplink_iface" value="{{ o.firewall.uplinkIface }}" placeholder="eth0" required />
+    <label class="check"><input type="checkbox" name="enabled" {% if o.firewall.enabled %}checked{% endif %}/> Isolate WLAN/LAN</label>
+    <button type="submit">Apply Firewall</button>
+  </form>
 </section>
 
 <section class="panel">
@@ -34,10 +84,7 @@
 </section>
 
 <section class="panel">
-  <h3>Connected Clients</h3>
-  {% if o.networks %}
-    <p class="networks">Detected networks: {{ o.networks | join(', ') }}</p>
-  {% endif %}
+  <h3>Clients</h3>
   <table>
     <thead>
       <tr><th>Device</th><th>IP</th><th>Subnet</th><th>MAC</th><th>Status</th><th>Actions</th></tr>
@@ -55,7 +102,7 @@
                 <button hx-post="/clients/{{ c.mac }}/block" hx-target="#overview">Block</button>
               {% endif %}
               <form hx-post="/clients/{{ c.mac }}/static-lease" hx-target="#overview">
-                <input name="ip" placeholder="192.168.8.50" value="{{ c.staticLeaseIp or '' }}" />
+                <input name="ip" placeholder="192.168.50.20" value="{{ c.staticLeaseIp or '' }}" />
                 <button type="submit">Set Lease</button>
               </form>
               {% if c.staticLeaseIp %}
@@ -67,4 +114,28 @@
       {% endfor %}
     </tbody>
   </table>
+</section>
+
+<section class="panel">
+  <h3>Monitoring</h3>
+  <details>
+    <summary>hostapd stations</summary>
+    <pre>{{ o.monitor.hostapdStations }}</pre>
+  </details>
+  <details>
+    <summary>DHCP leases</summary>
+    <pre>{{ o.monitor.dhcpLeases }}</pre>
+  </details>
+  <details>
+    <summary>Neighbors</summary>
+    <pre>{{ o.monitor.neighbors }}</pre>
+  </details>
+  <details>
+    <summary>Interfaces</summary>
+    <pre>{{ o.monitor.interfaces }}</pre>
+  </details>
+  <details>
+    <summary>Routes</summary>
+    <pre>{{ o.monitor.routes }}</pre>
+  </details>
 </section>
