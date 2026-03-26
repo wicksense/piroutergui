@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 from datetime import datetime
+from ipaddress import ip_network
 from pathlib import Path
 from typing import Any
 
@@ -147,6 +148,34 @@ def infer_device_type(name: str) -> str:
     return "Device"
 
 
+def subnet_from_ip(ip: str) -> str:
+    parts = ip.split(".")
+    if len(parts) == 4:
+        return f"{parts[0]}.{parts[1]}.{parts[2]}.0/24"
+    return "unknown"
+
+
+def get_local_networks() -> list[str]:
+    out = exec_text("ip -4 route show")
+    networks: list[str] = []
+    for line in out.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        first = line.split()[0]
+        if first == "default":
+            continue
+        if "/" not in first:
+            first = f"{first}/32"
+        try:
+            net = str(ip_network(first, strict=False))
+            if net not in networks:
+                networks.append(net)
+        except Exception:
+            continue
+    return networks
+
+
 def discover_clients() -> list[dict[str, Any]]:
     neigh = exec_text("ip -4 neigh show")
     leases = read_dhcp_leases()
@@ -154,6 +183,7 @@ def discover_clients() -> list[dict[str, Any]]:
     blocked = {x.lower() for x in state.get("blockedMacs", [])}
     rows: dict[str, dict[str, Any]] = {}
 
+    # First pass: kernel neighbor table (actively seen clients)
     for line in neigh.splitlines():
         parts = line.split()
         if len(parts) < 2:
@@ -178,10 +208,29 @@ def discover_clients() -> list[dict[str, Any]]:
         rows[ip] = {
             "name": hostname or f"client-{ip.split('.')[-1]}",
             "ip": ip,
+            "subnet": subnet_from_ip(ip),
             "mac": resolved_mac,
             "iface": iface,
             "type": infer_device_type(hostname or ""),
             "status": "Idle" if status == "STALE" else "Online",
+            "blocked": resolved_mac != "N/A" and resolved_mac.lower() in blocked,
+            "staticLeaseIp": state.get("staticLeases", {}).get(resolved_mac.lower()),
+        }
+
+    # Second pass: DHCP leases that may be on isolated subnets and not in neigh yet
+    for ip, lease in leases.items():
+        if ip in rows:
+            continue
+        hostname = lease.get("hostname")
+        resolved_mac = str(lease.get("mac") or "N/A")
+        rows[ip] = {
+            "name": hostname or f"client-{ip.split('.')[-1]}",
+            "ip": ip,
+            "subnet": subnet_from_ip(ip),
+            "mac": resolved_mac,
+            "iface": "dhcp",
+            "type": infer_device_type(hostname or ""),
+            "status": "Lease",
             "blocked": resolved_mac != "N/A" and resolved_mac.lower() in blocked,
             "staticLeaseIp": state.get("staticLeases", {}).get(resolved_mac.lower()),
         }
@@ -211,6 +260,7 @@ def get_overview() -> dict[str, Any]:
             "dnsmasq": exec_text("systemctl is-active dnsmasq") or "unknown",
             "nftables": exec_text("systemctl is-active nftables") or "unknown",
         },
+        "networks": get_local_networks(),
         "clients": discover_clients(),
     }
 

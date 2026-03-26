@@ -24,14 +24,17 @@
 
 <section class="panel">
   <h3>Connected Clients</h3>
+  {% if o.networks %}
+    <p class="networks">Detected networks: {{ o.networks | join(', ') }}</p>
+  {% endif %}
   <table>
     <thead>
-      <tr><th>Device</th><th>IP</th><th>MAC</th><th>Status</th><th>Actions</th></tr>
+      <tr><th>Device</th><th>IP</th><th>Subnet</th><th>MAC</th><th>Status</th><th>Actions</th></tr>
     </thead>
     <tbody>
       {% for c in o.clients %}
         <tr>
-          <td>{{ c.name }}</td><td>{{ c.ip }}</td><td>{{ c.mac }}</td>
+          <td>{{ c.name }}</td><td>{{ c.ip }}</td><td>{{ c.subnet }}</td><td>{{ c.mac }}</td>
           <td><span class="{{ 'ok' if c.status == 'Online' else 'idle' }}">{{ c.status }}</span></td>
           <td class="actions">
             {% if c.mac != 'N/A' %}
